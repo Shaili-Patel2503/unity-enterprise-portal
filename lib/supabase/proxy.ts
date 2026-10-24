@@ -2,25 +2,25 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const APPROVED_STAFF_IDS = new Set([
+  "b9650894-1845-41c2-ab76-5d74f82179d0",
+  "70ff875c-5742-4489-a35f-59f9dceb507e",
+]);
+
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  let supabaseResponse = NextResponse.next({ request });
 
   const pathname = request.nextUrl.pathname;
 
-  // Public pages: customers can browse the catalog without signing in.
+  // Customers can browse the public catalog without signing in.
   const isPublicCatalog =
     pathname === "/catalog" || pathname.startsWith("/catalog/");
 
-  // The login page is also public.
-  const isLoginPage = pathname === "/login";
-
-  // Let public pages load without requiring staff authentication.
-  // The catalog reads only from the restricted catalog_products view.
   if (isPublicCatalog) {
     return supabaseResponse;
   }
+
+  const isLoginPage = pathname === "/login";
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabasePublishableKey =
@@ -28,7 +28,7 @@ export async function updateSession(request: NextRequest) {
 
   if (!supabaseUrl || !supabasePublishableKey) {
     throw new Error(
-      "Supabase configuration is missing. Check your .env.local file."
+      "Supabase configuration is missing. Check your environment variables."
     );
   }
 
@@ -46,9 +46,7 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value);
           });
 
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          supabaseResponse = NextResponse.next({ request });
 
           cookiesToSet.forEach(({ name, value, options }) => {
             supabaseResponse.cookies.set(name, value, options);
@@ -58,13 +56,18 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Verify the user's authentication token.
+  // Verify the authentication token.
   const { data, error } = await supabase.auth.getClaims();
-  const hasValidSession = !error && Boolean(data?.claims);
+  const claims = data?.claims;
+  const userId =
+    typeof claims?.sub === "string" ? claims.sub : null;
 
-  // Login page is accessible without signing in.
+  const isApprovedStaff =
+    !error && userId !== null && APPROVED_STAFF_IDS.has(userId);
+
+  // Only approved staff can access the internal portal.
   if (isLoginPage) {
-    if (hasValidSession) {
+    if (isApprovedStaff) {
       const dashboardUrl = request.nextUrl.clone();
       dashboardUrl.pathname = "/";
       dashboardUrl.search = "";
@@ -78,11 +81,11 @@ export async function updateSession(request: NextRequest) {
       return redirectResponse;
     }
 
+    // Signed-out users and unapproved users can see the login page.
     return supabaseResponse;
   }
 
-  // All remaining internal pages require a valid staff session.
-  if (!hasValidSession) {
+  if (!isApprovedStaff) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
@@ -98,4 +101,3 @@ export async function updateSession(request: NextRequest) {
 
   return supabaseResponse;
 }
-
