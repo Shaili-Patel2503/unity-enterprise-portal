@@ -1,6 +1,5 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,32 +9,81 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 /coverage
 
-# next.js
+# Next.js
 /.next/
 /out/
-
-# production
 /build
 
-# misc
-.DS_Store
-*.pem
+# Environment variables and secrets
+.env*
+!.env.example
 
-# debug
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Debug logs and OS files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+.DS_Store
+*.pem
 
-# env files (can opt-in for committing if needed)
-.env*
+# Local backups and temporary review artifacts
+/backups/
+/embedded_images/
+/extracted_photos/
+/pages_to_review/
+/photo_mapping_review/
+/photo_review_sheets/
+/product_photos/
+/catalog_page_checks/
 
-# vercel
-.vercel
+# Catalog working files and import reports
+/catalog_extracted.csv
+/catalog_image_verification_report.csv
+/catalog_import_*.csv
+/catalog_import_*.sql
+/catalog_model_conflicts.csv
+/catalog_photo_audit.csv
+/catalog_preimport_checks*.sql
+/catalog_safe*.sql
+/category_review.csv
+/image_page_map.json
+/image_position_report.txt
+/model_photo_review.csv
+/photo_match_candidates.csv
+/photo_match_details.txt
+/photo_review*.csv
+/photo_review_report.txt
+/product_catalog_mapping_review.csv
+/product_photo_*.csv
+/product_photo_*.jpg
+/product_photo_*.txt
+/shared_photo_assignments.csv
+/shared_photo_page_text.txt
+/supabase_storage_objects*.csv
+/candidate_photo_review.jpg
+/contact_sheet.jpg
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# Local analysis scripts
+/check_*.cjs
+/check_*.py
+/extract_*.py
+/find_unmatched_photos.py
+/inspect_*.cjs
+/inspect_*.py
+/make_*.py
+/map_images.py
+/read_catalog_pages.py
+/test_supabase_endpoints.cjs
+/verify_all_catalog_images.sql
+
+# Keep the actual application source and assets tracked.
