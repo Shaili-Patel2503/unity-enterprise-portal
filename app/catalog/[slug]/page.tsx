@@ -20,19 +20,22 @@ type Product = {
   slug: string | null;
 };
 
-const PDF_MRP: Record<string, number> = { "DM 145": 250 };
 const WHATSAPP = "919998213691";
 
 function displayPrice(product: Product): string {
   const raw = product.selling_price;
-  const price = raw === null || raw === "" ? null : Number(raw);
 
-  if (price !== null && Number.isFinite(price)) {
-    return `₹${price.toLocaleString("en-IN")}`;
+  if (raw === null || raw === "") {
+    return "Price on request";
   }
 
-  const fallback = PDF_MRP[product.model.trim()];
-  return fallback ? `₹${fallback.toLocaleString("en-IN")}` : "Price on request";
+  const price = Number(raw);
+
+  if (!Number.isFinite(price) || price < 0) {
+    return "Price on request";
+  }
+
+  return `₹${price.toLocaleString("en-IN")}`;
 }
 
 function LoadingProductPage() {
@@ -94,7 +97,10 @@ function CatalogProductContent() {
                   .createSignedUrl(path, 60 * 60);
 
               if (imageError) {
-                console.warn("Product image unavailable:", imageError.message);
+                console.warn(
+                  "Product image unavailable:",
+                  imageError.message
+                );
               }
 
               return imageData?.signedUrl ?? "";

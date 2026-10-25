@@ -22,12 +22,12 @@ type Product = {
 
 const WHATSAPP_NUMBER = "919998213691";
 
-const PDF_MRP: Record<string, number> = {
-  "DM 145": 250,
-};
-
 function formatPrice(price: number | null) {
-  if (price === null || !Number.isFinite(Number(price))) {
+  if (
+    price === null ||
+    !Number.isFinite(Number(price)) ||
+    Number(price) < 0
+  ) {
     return "Price on request";
   }
 
@@ -35,14 +35,17 @@ function formatPrice(price: number | null) {
 }
 
 function getPrice(product: Product): number | null {
+  const price = product.selling_price;
+
   if (
-    product.selling_price !== null &&
-    Number.isFinite(Number(product.selling_price))
+    price === null ||
+    !Number.isFinite(Number(price)) ||
+    Number(price) < 0
   ) {
-    return Number(product.selling_price);
+    return null;
   }
 
-  return PDF_MRP[product.model] ?? null;
+  return Number(price);
 }
 
 function getProductHref(product: Product) {

@@ -40,6 +40,13 @@ type DatabaseProduct = {
   slug: string | null;
 };
 
+type ProductFilter =
+  | "all"
+  | "published"
+  | "hidden"
+  | "price-missing"
+  | "photos-missing";
+
 const emptyForm = {
   model: "",
   name: "",
@@ -59,6 +66,14 @@ const productSelect =
 
 const inputClass =
   "mt-2 w-full rounded-xl border border-[#e5dac8] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#a17a3e] focus:ring-2 focus:ring-[#eadcc3]";
+
+const filterOptions: { value: ProductFilter; label: string }[] = [
+  { value: "all", label: "All products" },
+  { value: "published", label: "Published" },
+  { value: "hidden", label: "Hidden" },
+  { value: "price-missing", label: "Price missing" },
+  { value: "photos-missing", label: "Photos missing" },
+];
 
 function toProduct(row: DatabaseProduct): Product {
   return {
@@ -89,8 +104,15 @@ function makeSlug(model: string) {
   return `${base || "bag"}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
+function validPrice(value: string): boolean {
+  if (value.trim() === "") return false;
+
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0;
+}
+
 function formatPrice(value: string) {
-  if (!value) return "Not entered";
+  if (!validPrice(value)) return "Price on request";
 
   return `₹${Number(value).toLocaleString("en-IN", {
     maximumFractionDigits: 2,
@@ -164,6 +186,71 @@ function ProductPhoto({
   );
 }
 
+function ExistingPhoto({
+  path,
+  onRemove,
+}: {
+  path: string;
+  onRemove: () => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function sign() {
+      const supabase = createClient();
+
+      const { data, error } = await supabase.storage
+        .from("product-images")
+        .createSignedUrl(path, 60 * 60);
+
+      if (!cancelled && !error && data?.signedUrl) {
+        setUrl(data.signedUrl);
+        setFailed(false);
+      } else if (!cancelled) {
+        setFailed(true);
+      }
+    }
+
+    void sign();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+
+  return (
+    <div className="rounded-xl border border-[#e9dfce] bg-[#f7f4ec] p-2">
+      {url && !failed ? (
+        <img
+          src={url}
+          alt="Existing product photo"
+          onError={() => setFailed(true)}
+          className="h-32 w-full rounded-lg bg-white object-contain"
+        />
+      ) : (
+        <div className="flex h-32 items-center justify-center rounded-lg bg-white px-3 text-center text-xs text-[#817565]">
+          {failed ? "Photo could not be loaded" : "Loading photo..."}
+        </div>
+      )}
+
+      <p className="mt-1 truncate text-xs text-[#817565]" title={path}>
+        {path.split("/").pop()}
+      </p>
+
+      <button
+        type="button"
+        onClick={onRemove}
+        className="mt-2 text-xs font-semibold text-red-700 hover:underline"
+      >
+        Remove photo
+      </button>
+    </div>
+  );
+}
+
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -174,6 +261,7 @@ export default function ProductsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<ProductFilter>("all");
   const [message, setMessage] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -235,7 +323,6 @@ export default function ProductsPage() {
 
   useEffect(() => {
     const urls = newPhotos.map((file) => URL.createObjectURL(file));
-
     setPhotoPreviews(urls);
 
     return () => urls.forEach((url) => URL.revokeObjectURL(url));
@@ -355,8 +442,8 @@ export default function ProductsPage() {
       return;
     }
 
-    const cost = form.cost.trim() ? Number(form.cost) : null;
-    const price = form.price.trim() ? Number(form.price) : null;
+    const cost = form.cost.trim() === "" ? null : Number(form.cost);
+    const price = form.price.trim() === "" ? null : Number(form.price);
 
     if (
       (cost !== null && (!Number.isFinite(cost) || cost < 0)) ||
@@ -368,7 +455,7 @@ export default function ProductsPage() {
 
     if (form.isActive === "true" && price === null) {
       setMessage(
-        "Enter a selling price before publishing a product to the public catalog."
+        "This product cannot be published without a selling price. Enter an approved price or keep it hidden."
       );
       return;
     }
@@ -394,22 +481,16 @@ export default function ProductsPage() {
       for (let index = 0; index < newPhotos.length; index++) {
         const photo = newPhotos[index];
 
-        setMessage(
-          `Optimising photo ${index + 1} of ${newPhotos.length}...`
-        );
-
+        setMessage(`Optimising photo ${index + 1} of ${newPhotos.length}...`);
         totalOriginalKb += photo.size / 1024;
 
         const compressedPhoto = await compressProductPhoto(photo);
-
         totalCompressedKb += compressedPhoto.size / 1024;
 
         const safeModel = model.replace(/[^a-zA-Z0-9_-]/g, "_");
         const path = `${safeModel}/${crypto.randomUUID()}.jpg`;
 
-        setMessage(
-          `Uploading photo ${index + 1} of ${newPhotos.length}...`
-        );
+        setMessage(`Uploading photo ${index + 1} of ${newPhotos.length}...`);
 
         const { error } = await supabase.storage
           .from("product-images")
@@ -453,7 +534,6 @@ export default function ProductsPage() {
           .single();
 
         if (error) throw error;
-
         savedRow = data as DatabaseProduct;
       } else {
         const { data, error } = await supabase
@@ -463,7 +543,6 @@ export default function ProductsPage() {
           .single();
 
         if (error) throw error;
-
         savedRow = data as DatabaseProduct;
       }
 
@@ -541,9 +620,9 @@ export default function ProductsPage() {
     const nextValue =
       field === "is_active" ? !product.isActive : !product.isNewArrival;
 
-    if (field === "is_active" && nextValue && !product.price) {
+    if (field === "is_active" && nextValue && !validPrice(product.price)) {
       setMessage(
-        "Add a selling price by editing this product before publishing it."
+        `Cannot publish ${product.model}: enter an approved selling price first. Its current status is Price on request.`
       );
       return;
     }
@@ -628,11 +707,42 @@ export default function ProductsPage() {
     }
   }
 
-  const filteredProducts = products.filter((product) =>
+  const searchedProducts = products.filter((product) =>
     `${product.model} ${product.name} ${product.category} ${product.colors} ${product.size}`
       .toLowerCase()
-      .includes(search.toLowerCase())
+      .includes(search.trim().toLowerCase())
   );
+
+  const filteredProducts = searchedProducts.filter((product) => {
+    switch (filter) {
+      case "published":
+        return product.isActive;
+
+      case "hidden":
+        return !product.isActive;
+
+      case "price-missing":
+        return !validPrice(product.price);
+
+      case "photos-missing":
+        return product.imageUrls.length === 0;
+
+      default:
+        return true;
+    }
+  });
+
+  const counts: Record<ProductFilter, number> = {
+    all: products.length,
+    published: products.filter((product) => product.isActive).length,
+    hidden: products.filter((product) => !product.isActive).length,
+    "price-missing": products.filter(
+      (product) => !validPrice(product.price)
+    ).length,
+    "photos-missing": products.filter(
+      (product) => product.imageUrls.length === 0
+    ).length,
+  };
 
   if (!loaded) {
     return (
@@ -679,8 +789,8 @@ export default function ProductsPage() {
                 </h1>
 
                 <p className="mt-2 max-w-xl text-sm leading-6 text-[#817565]">
-                  Every bag has a story. Manage your collection, pricing,
-                  photos and customer visibility in one place.
+                  Manage bag models, pricing, photos and customer visibility
+                  in one place.
                 </p>
               </div>
             </div>
@@ -698,7 +808,7 @@ export default function ProductsPage() {
         </header>
 
         <section className="mt-6 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-[#e9dfce] bg-[#fffdf8] p-5 transition hover:shadow-sm">
+          <div className="rounded-2xl border border-[#e9dfce] bg-[#fffdf8] p-5">
             <p className="text-sm text-[#817565]">Total bag models</p>
             <p className="mt-2 text-3xl font-semibold tabular-nums">
               {products.length}
@@ -708,24 +818,23 @@ export default function ProductsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e9dfce] bg-[#fffdf8] p-5 transition hover:shadow-sm">
+          <div className="rounded-2xl border border-[#e9dfce] bg-[#fffdf8] p-5">
             <p className="text-sm text-[#817565]">Published products</p>
             <p className="mt-2 text-3xl font-semibold tabular-nums">
-              {products.filter((product) => product.isActive).length}
+              {counts.published}
             </p>
             <p className="mt-1 text-xs text-[#9a8b78]">
               Marked for the public catalog
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#e9dfce] bg-[#fffdf8] p-5 transition hover:shadow-sm">
-            <p className="text-sm text-[#817565]">Database status</p>
-            <p className="mt-2 flex items-center gap-2 text-xl font-semibold text-[#62724c]">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#82976a]" />
-              Connected
+          <div className="rounded-2xl border border-[#e9dfce] bg-[#fffdf8] p-5">
+            <p className="text-sm text-[#817565]">Needs attention</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums">
+              {counts["price-missing"] + counts["photos-missing"]}
             </p>
             <p className="mt-1 text-xs text-[#9a8b78]">
-              Supabase · Shared online data
+              Missing prices and photos; a product may need both
             </p>
           </div>
         </section>
@@ -843,16 +952,19 @@ export default function ProductsPage() {
               </label>
 
               <label className="text-sm font-medium">
-                Selling price per piece (₹)
+                Approved selling price per piece (₹)
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={form.price}
                   onChange={(event) => updateField("price", event.target.value)}
-                  placeholder="e.g. 35"
+                  placeholder="Leave blank until approved"
                   className={inputClass}
                 />
+                <span className="mt-1 block text-xs font-normal text-[#817565]">
+                  No PDF MRP is used automatically. Blank means Price on request.
+                </span>
               </label>
 
               <label className="text-sm font-medium sm:col-span-2">
@@ -889,11 +1001,9 @@ export default function ProductsPage() {
                     className="mt-1 h-4 w-4 accent-[#6d7658]"
                   />
                   <span>
-                    <span className="font-semibold">
-                      Show in public catalog
-                    </span>
+                    <span className="font-semibold">Show in public catalog</span>
                     <span className="mt-1 block leading-5 text-[#817565]">
-                      Publish when the product details and selling price are ready.
+                      Requires an approved selling price before saving.
                     </span>
                   </span>
                 </label>
@@ -1021,7 +1131,7 @@ export default function ProductsPage() {
               </p>
               <h2 className="mt-2 text-2xl font-semibold">Product models</h2>
               <p className="mt-2 text-sm text-[#817565]">
-                Select a card to open its customer-facing detail page.
+                Search your collection and filter products by their current status.
               </p>
             </div>
 
@@ -1034,6 +1144,60 @@ export default function ProductsPage() {
             />
           </div>
 
+          <div className="mt-5 rounded-2xl border border-[#e9dfce] bg-[#fffdf8] p-4 sm:p-5">
+            <p className="mb-3 text-sm font-semibold text-[#675443]">
+              Filter products
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {filterOptions.map((option) => {
+                const selected = filter === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setFilter(option.value)}
+                    className={`rounded-full border px-4 py-2.5 text-sm font-medium transition ${
+                      selected
+                        ? "border-[#6d7658] bg-[#6d7658] text-white"
+                        : "border-[#dfd4c2] bg-white text-[#675443] hover:bg-[#f7f4ec]"
+                    }`}
+                  >
+                    {option.label}
+                    <span className="ml-2 tabular-nums opacity-80">
+                      {counts[option.value]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eee5d6] pt-4 text-sm text-[#817565]">
+              <p>
+                Showing{" "}
+                <strong className="text-[#30291f]">
+                  {filteredProducts.length}
+                </strong>{" "}
+                of {products.length} products
+              </p>
+
+              {(filter !== "all" || search !== "") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter("all");
+                    setSearch("");
+                  }}
+                  className="font-semibold text-[#80643e] hover:underline"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          </div>
+
           {filteredProducts.length === 0 ? (
             <div className="mt-6 rounded-3xl border border-dashed border-[#d9cbb4] bg-[#fffdf8] px-5 py-16 text-center">
               <img
@@ -1042,184 +1206,226 @@ export default function ProductsPage() {
                 className="mx-auto h-14 w-14 object-contain opacity-40"
               />
               <p className="mt-4 text-lg font-semibold">
-                {search ? "No matching products found" : "Your collection starts here"}
+                {search || filter !== "all"
+                  ? "No matching products found"
+                  : "Your collection starts here"}
               </p>
               <p className="mt-2 text-sm text-[#817565]">
-                {search
-                  ? "Try another model number, size, colour or name."
+                {search || filter !== "all"
+                  ? "Try another search or choose a different filter."
                   : 'Select "+ Add a product" to enter your first bag model.'}
               </p>
+
+              {(search || filter !== "all") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter("all");
+                    setSearch("");
+                  }}
+                  className="mt-4 rounded-full border border-[#dfd4c2] px-5 py-2.5 text-sm font-semibold text-[#675443] hover:bg-[#f7f4ec]"
+                >
+                  Show all products
+                </button>
+              )}
             </div>
           ) : (
             <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredProducts.map((product) => (
-                <article
-                  key={product.id}
-                  className="group overflow-hidden rounded-[1.6rem] border border-[#e9dfce] bg-[#fffdf8] shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#d4c09b] hover:shadow-xl"
-                >
-                  <a
-                    href={
-                      product.slug
-                        ? `/catalog/${encodeURIComponent(product.slug)}`
-                        : "/catalog"
-                    }
-                    aria-label={`View details for ${product.model}, ${product.name}`}
-                    className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#a17a3e]"
+              {filteredProducts.map((product) => {
+                const hasPrice = validPrice(product.price);
+                const hasPhotos = product.imageUrls.length > 0;
+
+                return (
+                  <article
+                    key={product.id}
+                    className="group overflow-hidden rounded-[1.6rem] border border-[#e9dfce] bg-[#fffdf8] shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#d4c09b] hover:shadow-xl"
                   >
-                    <div className="relative flex h-72 items-center justify-center overflow-hidden bg-[#f3eee4] sm:h-80">
-                      <ProductPhoto
-                        src={product.photoUrl}
-                        name={product.name}
-                      />
+                    <a
+                      href={
+                        product.slug
+                          ? `/catalog/${encodeURIComponent(product.slug)}`
+                          : "/catalog"
+                      }
+                      aria-label={`View details for ${product.model}, ${product.name}`}
+                      className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#a17a3e]"
+                    >
+                      <div className="relative flex h-72 items-center justify-center overflow-hidden bg-[#f3eee4] sm:h-80">
+                        <ProductPhoto
+                          src={product.photoUrl}
+                          name={product.name}
+                        />
 
-                      {product.isNewArrival && (
-                        <span className="absolute left-4 top-4 rounded-full bg-[#6d7658] px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
-                          New arrival
-                        </span>
-                      )}
+                        {product.isNewArrival && (
+                          <span className="absolute left-4 top-4 rounded-full bg-[#6d7658] px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
+                            New arrival
+                          </span>
+                        )}
 
-                      <span
-                        className={`absolute right-4 top-4 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm ${
-                          product.isActive
-                            ? "bg-[#e5edda] text-[#4e633d]"
-                            : "bg-[#fffdf8]/95 text-[#817565]"
-                        }`}
-                      >
-                        {product.isActive ? "Published" : "Hidden"}
-                      </span>
-
-                      <span className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#fffdf8]/90 text-lg text-[#80643e] shadow-sm transition group-hover:translate-x-1">
-                        →
-                      </span>
-                    </div>
-
-                    <div className="p-5 sm:p-6">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a17a3e]">
-                        {product.category}
-                      </p>
-
-                      <div className="mt-2 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="text-xl font-semibold tracking-tight">
-                            {product.model}
-                          </h3>
-                          <p className="mt-1 text-sm leading-5 text-[#817565]">
-                            {product.name}
-                          </p>
-                        </div>
-
-                        <p className="shrink-0 text-lg font-semibold text-[#687451]">
-                          {formatPrice(product.price)}
-                        </p>
-                      </div>
-
-                      {(product.size || product.colors) && (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {product.size && (
-                            <span className="rounded-full bg-[#f2eee5] px-3 py-1.5 text-xs text-[#756a5a]">
-                              Size: {product.size}
-                            </span>
-                          )}
-
-                          {product.colors && (
-                            <span className="max-w-full rounded-full bg-[#f2eee5] px-3 py-1.5 text-xs text-[#756a5a]">
-                              {product.colors}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {product.publicDescription && (
-                        <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#817565]">
-                          {product.publicDescription}
-                        </p>
-                      )}
-
-                      <div className="mt-5 flex items-center justify-between border-t border-[#eee5d6] pt-4">
-                        <span className="text-sm font-semibold text-[#80643e]">
-                          View product details
-                        </span>
                         <span
-                          aria-hidden="true"
-                          className="text-sm text-[#80643e]"
+                          className={`absolute right-4 top-4 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm ${
+                            product.isActive
+                              ? "bg-[#e5edda] text-[#4e633d]"
+                              : "bg-[#fffdf8]/95 text-[#817565]"
+                          }`}
                         >
-                          ↗
+                          {product.isActive ? "Published" : "Hidden"}
+                        </span>
+
+                        <span className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-[#fffdf8]/90 text-lg text-[#80643e] shadow-sm transition group-hover:translate-x-1">
+                          →
                         </span>
                       </div>
-                    </div>
-                  </a>
 
-                  <div className="border-t border-dashed border-[#dfd4c2] p-5 sm:p-6">
-                    <details className="text-sm">
-                      <summary className="cursor-pointer font-medium text-[#817565] transition hover:text-[#4e3c25]">
-                        Staff information
-                      </summary>
-
-                      <div className="mt-3 space-y-2 rounded-xl bg-[#f7f4ec] p-4">
-                        <p className="break-words">
-                          <span className="text-[#817565]">Landed cost:</span>{" "}
-                          <strong>{formatPrice(product.cost)}</strong>
+                      <div className="p-5 sm:p-6">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a17a3e]">
+                          {product.category}
                         </p>
 
-                        <p className="break-words">
-                          <span className="text-[#817565]">Selling price:</span>{" "}
-                          <strong>{formatPrice(product.price)}</strong>
-                        </p>
+                        <div className="mt-2 flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="text-xl font-semibold tracking-tight">
+                              {product.model}
+                            </h3>
+                            <p className="mt-1 text-sm leading-5 text-[#817565]">
+                              {product.name}
+                            </p>
+                          </div>
 
-                        {product.notes && (
-                          <p className="break-words">
-                            <span className="text-[#817565]">Internal notes:</span>{" "}
-                            {product.notes}
+                          <div className="shrink-0 text-right">
+                            <p
+                              className={`text-lg font-semibold ${
+                                hasPrice ? "text-[#687451]" : "text-[#8b7860]"
+                              }`}
+                            >
+                              {formatPrice(product.price)}
+                            </p>
+                            <p className="mt-1 text-[10px] text-[#9a8b78]">
+                              {hasPrice ? "Selling price entered" : "Price not entered"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {(!hasPrice || !hasPhotos) && (
+                          <div className="mt-3 space-y-2">
+                            {!hasPrice && (
+                              <p className="rounded-lg bg-[#fff4df] px-3 py-2 text-xs leading-5 text-[#805d2d]">
+                                Add an approved selling price before publishing.
+                              </p>
+                            )}
+
+                            {!hasPhotos && (
+                              <p className="rounded-lg bg-[#f2eee5] px-3 py-2 text-xs leading-5 text-[#756a5a]">
+                                No product photo has been added yet.
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {(product.size || product.colors) && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {product.size && (
+                              <span className="rounded-full bg-[#f2eee5] px-3 py-1.5 text-xs text-[#756a5a]">
+                                Size: {product.size}
+                              </span>
+                            )}
+
+                            {product.colors && (
+                              <span className="max-w-full rounded-full bg-[#f2eee5] px-3 py-1.5 text-xs text-[#756a5a]">
+                                {product.colors}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {product.publicDescription && (
+                          <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#817565]">
+                            {product.publicDescription}
                           </p>
                         )}
+
+                        <div className="mt-5 flex items-center justify-between border-t border-[#eee5d6] pt-4">
+                          <span className="text-sm font-semibold text-[#80643e]">
+                            View product details
+                          </span>
+                          <span aria-hidden="true" className="text-sm text-[#80643e]">
+                            ↗
+                          </span>
+                        </div>
                       </div>
-                    </details>
+                    </a>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEditing(product)}
-                        className="rounded-full border border-[#dfd4c2] px-3.5 py-2 text-xs font-semibold transition hover:bg-[#f7f4ec]"
-                      >
-                        Edit
-                      </button>
+                    <div className="border-t border-dashed border-[#dfd4c2] p-5 sm:p-6">
+                      <details className="text-sm">
+                        <summary className="cursor-pointer font-medium text-[#817565] transition hover:text-[#4e3c25]">
+                          Staff information
+                        </summary>
 
-                      <button
-                        type="button"
-                        disabled={updatingId === product.id}
-                        onClick={() => void toggleProductFlag(product, "is_active")}
-                        className="rounded-full border border-[#cbd5bd] px-3.5 py-2 text-xs font-semibold text-[#536442] transition hover:bg-[#edf1e7] disabled:opacity-60"
-                      >
-                        {updatingId === product.id
-                          ? "Updating..."
-                          : product.isActive
-                            ? "Hide"
-                            : "Publish"}
-                      </button>
+                        <div className="mt-3 space-y-2 rounded-xl bg-[#f7f4ec] p-4">
+                          <p className="break-words">
+                            <span className="text-[#817565]">Landed cost:</span>{" "}
+                            <strong>{formatPrice(product.cost)}</strong>
+                          </p>
 
-                      <button
-                        type="button"
-                        disabled={updatingId === product.id}
-                        onClick={() =>
-                          void toggleProductFlag(product, "is_new_arrival")
-                        }
-                        className="rounded-full border border-[#e4d2ae] px-3.5 py-2 text-xs font-semibold text-[#8d6d3d] transition hover:bg-[#fbf3e4] disabled:opacity-60"
-                      >
-                        {product.isNewArrival ? "Remove new" : "Mark new"}
-                      </button>
+                          <p className="break-words">
+                            <span className="text-[#817565]">Selling price:</span>{" "}
+                            <strong>{formatPrice(product.price)}</strong>
+                          </p>
 
-                      <button
-                        type="button"
-                        disabled={deletingId === product.id}
-                        onClick={() => void deleteProduct(product)}
-                        className="rounded-full border border-[#e8caca] px-3.5 py-2 text-xs font-semibold text-[#a34848] transition hover:bg-[#fff0f0] disabled:opacity-60"
-                      >
-                        {deletingId === product.id ? "Deleting..." : "Delete"}
-                      </button>
+                          {product.notes && (
+                            <p className="break-words">
+                              <span className="text-[#817565]">Internal notes:</span>{" "}
+                              {product.notes}
+                            </p>
+                          )}
+                        </div>
+                      </details>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEditing(product)}
+                          className="rounded-full border border-[#dfd4c2] px-3.5 py-2 text-xs font-semibold transition hover:bg-[#f7f4ec]"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={updatingId === product.id}
+                          onClick={() => void toggleProductFlag(product, "is_active")}
+                          className="rounded-full border border-[#cbd5bd] px-3.5 py-2 text-xs font-semibold text-[#536442] transition hover:bg-[#edf1e7] disabled:opacity-60"
+                        >
+                          {updatingId === product.id
+                            ? "Updating..."
+                            : product.isActive
+                              ? "Hide"
+                              : "Publish"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={updatingId === product.id}
+                          onClick={() =>
+                            void toggleProductFlag(product, "is_new_arrival")
+                          }
+                          className="rounded-full border border-[#e4d2ae] px-3.5 py-2 text-xs font-semibold text-[#8d6d3d] transition hover:bg-[#fbf3e4] disabled:opacity-60"
+                        >
+                          {product.isNewArrival ? "Remove new" : "Mark new"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={deletingId === product.id}
+                          onClick={() => void deleteProduct(product)}
+                          className="rounded-full border border-[#e8caca] px-3.5 py-2 text-xs font-semibold text-[#a34848] transition hover:bg-[#fff0f0] disabled:opacity-60"
+                        >
+                          {deletingId === product.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
@@ -1235,73 +1441,5 @@ export default function ProductsPage() {
         </footer>
       </div>
     </main>
-  );
-}
-
-function ExistingPhoto({
-  path,
-  onRemove,
-}: {
-  path: string;
-  onRemove: () => void;
-}) {
-  const [url, setUrl] = useState("");
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function sign() {
-      const supabase = createClient();
-
-      const { data, error } = await supabase.storage
-        .from("product-images")
-        .createSignedUrl(path, 60 * 60);
-
-      if (!cancelled && !error && data?.signedUrl) {
-        setUrl(data.signedUrl);
-        setFailed(false);
-      } else if (!cancelled) {
-        setFailed(true);
-      }
-    }
-
-    void sign();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [path]);
-
-  return (
-    <div className="rounded-xl border border-[#e9dfce] bg-[#f7f4ec] p-2">
-      {url && !failed ? (
-        <img
-          src={url}
-          alt="Existing product photo"
-          onError={() => setFailed(true)}
-          className="h-32 w-full rounded-lg bg-white object-contain"
-        />
-      ) : (
-        <div className="flex h-32 items-center justify-center rounded-lg bg-white px-3 text-center text-xs text-[#817565]">
-          {failed ? "Photo could not be loaded" : "Loading photo..."}
-        </div>
-      )}
-
-      <p
-        className="mt-1 truncate text-xs text-[#817565]"
-        title={path}
-      >
-        {path.split("/").pop()}
-      </p>
-
-      <button
-        type="button"
-        onClick={onRemove}
-        className="mt-2 text-xs font-semibold text-red-700 hover:underline"
-      >
-        Remove photo
-      </button>
-    </div>
   );
 }
