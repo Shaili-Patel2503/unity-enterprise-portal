@@ -261,6 +261,7 @@ export default function ProductsPage() {
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
   const [removeExistingPaths, setRemoveExistingPaths] = useState<string[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [isDraggingPhotos, setIsDraggingPhotos] = useState(false);
   const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -271,6 +272,8 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const loadProducts = useCallback(async () => {
     setLoaded(false);
@@ -372,6 +375,32 @@ export default function ProductsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function startDuplicating(product: Product) {
+    setEditingId(null);
+    setForm({
+      model: "",
+      name: "",
+      category: product.category,
+      size: product.size,
+      colors: product.colors,
+      cost: "",
+      price: "",
+      notes: "",
+      publicDescription: product.publicDescription,
+      isActive: "false",
+      isNewArrival: "false",
+      catalogAvailable: "false",
+    });
+    // Never copy photos or photo-removal instructions to the new product.
+    setNewPhotos([]);
+    setRemoveExistingPaths([]);
+    setExistingPhotoUrls([]);
+    setMessage(
+      `Details copied from ${product.model}. Enter a new model and name, add the correct photos, then save.`
+    );
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
   function openNewProductForm() {
     if (showForm) {
       resetForm();
@@ -676,6 +705,54 @@ export default function ProductsPage() {
     }
   }
 
+  async function bulkSetCatalogAvailability(available: boolean) {
+    const selectedIds = [...selectedProductIds];
+    if (selectedIds.length === 0 || bulkUpdating) return;
+    setBulkUpdating(true);
+    setMessage("");
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("products")
+        .update({ catalog_available: available })
+        .in("id", selectedIds)
+        .select(productSelect);
+      if (error) throw error;
+      const updatedRows = (data ?? []) as DatabaseProduct[];
+      if (updatedRows.length === 0) {
+        throw new Error("No products were updated.");
+      }
+      const updatedById = new Map<number, Product>(
+        updatedRows.map((row) => {
+          const updated = toProduct(row);
+          const previous = products.find((item) => item.id === updated.id);
+          return [
+            updated.id,
+            {
+              ...updated,
+              photoUrl: previous?.photoUrl ?? updated.photoUrl,
+            },
+          ] as const;
+        })
+      );
+      setProducts((current) =>
+        current.map((item) => updatedById.get(item.id) ?? item)
+      );
+      setSelectedProductIds([]);
+      setMessage(
+        `${updatedRows.length} product(s) marked ${
+          available ? "Available" : "Out of stock"
+        }. Physical inventory was not changed.`
+      );
+    } catch (error) {
+      console.error("Bulk availability update failed:", error);
+      setMessage(
+        "Could not update availability. Please check your connection and try again."
+      );
+    } finally {
+      setBulkUpdating(false);
+    }
+  }
   async function deleteProduct(product: Product) {
     const confirmed = window.confirm(
       "Delete this product from the shared database? This affects all authorised staff accounts."
@@ -1050,25 +1127,72 @@ export default function ProductsPage() {
               </div>
 
               <div className="sm:col-span-2 lg:col-span-3">
-                <label className="block text-sm font-medium">
-                  Product photos · up to 10 new photos
-                </label>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(event) => {
-                    choosePhotos(event.target.files);
-                    event.currentTarget.value = "";
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setIsDraggingPhotos(true);
                   }}
-                  className="mt-2 block w-full rounded-xl border border-[#e5dac8] bg-white px-3.5 py-3 text-sm"
-                />
-
-                <p className="mt-1 text-xs text-[#817565]">
-                  Maximum 10 MB per image. Photos are compressed before
-                  uploading. Existing photos remain unless removed below.
-                </p>
+                  onDragLeave={() => setIsDraggingPhotos(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsDraggingPhotos(false);
+                    choosePhotos(event.dataTransfer.files);
+                  }}
+                  className={`mt-2 rounded-2xl border-2 border-dashed p-4 transition sm:p-5 ${
+                    isDraggingPhotos
+                      ? "border-[#6d7658] bg-[#edf1e7]"
+                      : "border-[#d8cbb5] bg-[#fcfaf5]"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e9e4d6] text-[#526047]">
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          className="h-6 w-6"
+                          fill="none"
+                        >
+                          <path
+                            d="M12 16V4m0 0L7 9m5-5l5 5M5 14v5a1 1 0 001 1h12a1 1 0 001-1v-5"
+                            stroke="currentColor"
+                            strokeWidth="1.7"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-[#514638]">
+                          Drop product photos here
+                        </p>
+                        <p className="mt-1 text-xs text-[#817565]">
+                          Or choose images from your computer
+                        </p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#526047] ring-1 ring-[#e5dac8]">
+                      {newPhotos.length}/10 selected
+                    </span>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    aria-label="Choose product photos"
+                    onChange={(event) => {
+                      choosePhotos(event.target.files);
+                      event.currentTarget.value = "";
+                    }}
+                    className="mt-4 block w-full cursor-pointer rounded-xl border border-[#e5dac8] bg-white px-3.5 py-3 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-[#e9e4d6] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#43533b]"
+                  />
+                  <p className="mt-3 text-xs leading-5 text-[#817565]">
+                    You can add photos in multiple selections or drag them
+                    into this area. Up to 10 new photos, each 10 MB or smaller.
+                    Photos are compressed before uploading. Existing photos
+                    remain unless you remove them below.
+                  </p>
+                </div>
 
                 {editingId !== null && existingPhotoUrls.length > 0 && (
                   <div className="mt-4">
@@ -1160,7 +1284,10 @@ export default function ProductsPage() {
 
             <input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setSelectedProductIds([]);
+              }}
               placeholder="Search models, sizes, colours..."
               aria-label="Search products"
               className="w-full rounded-full border border-[#e5dac8] bg-[#fffdf8] px-5 py-3 text-sm outline-none transition focus:border-[#a17a3e] sm:max-w-sm"
@@ -1181,7 +1308,10 @@ export default function ProductsPage() {
                     key={option.value}
                     type="button"
                     aria-pressed={selected}
-                    onClick={() => setFilter(option.value)}
+                    onClick={() => {
+                      setFilter(option.value);
+                      setSelectedProductIds([]);
+                    }}
                     className={`rounded-full border px-4 py-2.5 text-sm font-medium transition ${
                       selected
                         ? "border-[#6d7658] bg-[#6d7658] text-white"
@@ -1212,6 +1342,7 @@ export default function ProductsPage() {
                   onClick={() => {
                     setFilter("all");
                     setSearch("");
+                    setSelectedProductIds([]);
                   }}
                   className="font-semibold text-[#80643e] hover:underline"
                 >
@@ -1221,6 +1352,67 @@ export default function ProductsPage() {
             </div>
           </div>
 
+          <div className="mt-4 rounded-2xl border border-[#e9dfce] bg-[#fffdf8] p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#514638]">
+                <input
+                  type="checkbox"
+                  checked={
+                    filteredProducts.length > 0 &&
+                    filteredProducts.every((product) =>
+                      selectedProductIds.includes(product.id)
+                    )
+                  }
+                  disabled={filteredProducts.length === 0 || bulkUpdating}
+                  onChange={(event) => {
+                    const visibleIds = filteredProducts.map(
+                      (product) => product.id
+                    );
+                    setSelectedProductIds((current) =>
+                      event.target.checked
+                        ? Array.from(new Set([...current, ...visibleIds]))
+                        : current.filter((id) => !visibleIds.includes(id))
+                    );
+                  }}
+                  className="h-4 w-4 accent-[#6d7658]"
+                />
+                Select all shown ({filteredProducts.length})
+              </label>
+              <span className="text-xs text-[#817565]">
+                {selectedProductIds.length} selected
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={selectedProductIds.length === 0 || bulkUpdating}
+                onClick={() => void bulkSetCatalogAvailability(true)}
+                className="rounded-full bg-[#526748] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#405338] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {bulkUpdating ? "Updating..." : "Mark selected Available"}
+              </button>
+              <button
+                type="button"
+                disabled={selectedProductIds.length === 0 || bulkUpdating}
+                onClick={() => void bulkSetCatalogAvailability(false)}
+                className="rounded-full border border-[#e1c4bc] bg-white px-4 py-2.5 text-sm font-semibold text-[#a14d3f] transition hover:bg-[#fff5f1] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Mark selected Out of stock
+              </button>
+              <button
+                type="button"
+                disabled={selectedProductIds.length === 0 || bulkUpdating}
+                onClick={() => setSelectedProductIds([])}
+                className="rounded-full border border-[#dfd4c2] px-4 py-2.5 text-sm font-medium text-[#675443] transition hover:bg-[#f7f4ec] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Clear selection
+              </button>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-[#817565]">
+              These actions change only customer-facing catalog availability.
+              They do not change stock quantities at Home or Godown.
+            </p>
+          </div>
           {filteredProducts.length === 0 ? (
             <div className="mt-6 rounded-3xl border border-dashed border-[#d9cbb4] bg-[#fffdf8] px-5 py-16 text-center">
               <img
@@ -1245,6 +1437,7 @@ export default function ProductsPage() {
                   onClick={() => {
                     setFilter("all");
                     setSearch("");
+                    setSelectedProductIds([]);
                   }}
                   className="mt-4 rounded-full border border-[#dfd4c2] px-5 py-2.5 text-sm font-semibold text-[#675443] hover:bg-[#f7f4ec]"
                 >
@@ -1261,8 +1454,26 @@ export default function ProductsPage() {
                 return (
                   <article
                     key={product.id}
-                    className="group overflow-hidden rounded-[1.6rem] border border-[#e9dfce] bg-[#fffdf8] shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#d4c09b] hover:shadow-xl"
+                    className="group relative overflow-hidden rounded-[1.6rem] border border-[#e9dfce] bg-[#fffdf8] shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#d4c09b] hover:shadow-xl"
                   >
+                    <label className="absolute left-3 top-3 z-20 inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#e9dfce] bg-white/95 px-3 py-2 text-xs font-semibold text-[#43533b] shadow-sm backdrop-blur">
+                      <input
+                        type="checkbox"
+                        checked={selectedProductIds.includes(product.id)}
+                        disabled={bulkUpdating}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setSelectedProductIds((current) =>
+                            checked
+                              ? Array.from(new Set([...current, product.id]))
+                              : current.filter((id) => id !== product.id)
+                          );
+                        }}
+                        aria-label={`Select ${product.model} for bulk availability update`}
+                        className="h-4 w-4 accent-[#6d7658]"
+                      />
+                      Select
+                    </label>
                     <a
                       href={
                         product.slug
@@ -1416,6 +1627,13 @@ export default function ProductsPage() {
                           className="rounded-full border border-[#dfd4c2] px-3.5 py-2 text-xs font-semibold transition hover:bg-[#f7f4ec]"
                         >
                           Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startDuplicating(product)}
+                          className="rounded-full border border-[#d6c49e] bg-[#fbf5e8] px-3.5 py-2 text-xs font-semibold text-[#795f32] transition hover:bg-[#f3e8d1]"
+                        >
+                          Duplicate
                         </button>
 
                         <button
