@@ -19,6 +19,7 @@ type Product = {
   imageUrls: string[];
   isActive: boolean;
   isNewArrival: boolean;
+  catalogAvailable: boolean;
   slug: string;
   photoUrl?: string;
 };
@@ -37,6 +38,7 @@ type DatabaseProduct = {
   public_description: string | null;
   is_active: boolean;
   is_new_arrival: boolean;
+  catalog_available: boolean;
   slug: string | null;
 };
 
@@ -59,10 +61,11 @@ const emptyForm = {
   publicDescription: "",
   isActive: "false",
   isNewArrival: "false",
+  catalogAvailable: "false",
 };
 
 const productSelect =
-  "id, model, name, category, size, colors, landed_cost, selling_price, notes, image_urls, public_description, is_active, is_new_arrival, slug";
+  "id, model, name, category, size, colors, landed_cost, selling_price, notes, image_urls, public_description, is_active, is_new_arrival, catalog_available, slug";
 
 const inputClass =
   "mt-2 w-full rounded-xl border border-[#e5dac8] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#a17a3e] focus:ring-2 focus:ring-[#eadcc3]";
@@ -90,6 +93,7 @@ function toProduct(row: DatabaseProduct): Product {
     imageUrls: row.image_urls ?? [],
     isActive: row.is_active,
     isNewArrival: row.is_new_arrival,
+    catalogAvailable: row.catalog_available ?? false,
     slug: row.slug ?? "",
   };
 }
@@ -356,6 +360,7 @@ export default function ProductsPage() {
       publicDescription: product.publicDescription,
       isActive: String(product.isActive),
       isNewArrival: String(product.isNewArrival),
+      catalogAvailable: String(product.catalogAvailable),
     });
 
     setNewPhotos([]);
@@ -519,6 +524,7 @@ export default function ProductsPage() {
         public_description: form.publicDescription.trim() || null,
         is_active: form.isActive === "true",
         is_new_arrival: form.isNewArrival === "true",
+        catalog_available: form.catalogAvailable === "true",
         image_urls: imageUrls,
         slug,
       };
@@ -1008,6 +1014,23 @@ export default function ProductsPage() {
                   </span>
                 </label>
 
+                <label className="block text-sm font-semibold">
+                  Catalog availability
+                  <select
+                    value={form.catalogAvailable}
+                    onChange={(event) =>
+                      updateField("catalogAvailable", event.target.value)
+                    }
+                    className={inputClass}
+                  >
+                    <option value="true">Available</option>
+                    <option value="false">Out of stock</option>
+                  </select>
+                  <span className="mt-1 block text-xs font-normal leading-5 text-[#817565]">
+                    This setting controls the availability customers see. It is
+                    separate from the physical stock recorded in Inventory.
+                  </span>
+                </label>
                 <label className="flex items-start gap-3 text-sm">
                   <input
                     type="checkbox"
@@ -1371,6 +1394,12 @@ export default function ProductsPage() {
                             <strong>{formatPrice(product.price)}</strong>
                           </p>
 
+                          <p className="break-words">
+                            <span className="text-[#817565]">Catalog availability:</span>{" "}
+                            <strong className={product.catalogAvailable ? "text-green-700" : "text-red-700"}>
+                              {product.catalogAvailable ? "Available" : "Out of stock"}
+                            </strong>
+                          </p>
                           {product.notes && (
                             <p className="break-words">
                               <span className="text-[#817565]">Internal notes:</span>{" "}

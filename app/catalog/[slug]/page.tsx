@@ -18,6 +18,7 @@ type Product = {
   image_urls: string[] | null;
   is_new_arrival: boolean;
   slug: string | null;
+  catalog_available: boolean;
 };
 
 const WHATSAPP = "919998213691";
@@ -76,7 +77,7 @@ function CatalogProductContent() {
         const { data, error: queryError } = await supabase
           .from("catalog_products")
           .select(
-            "id, model, name, category, size, colors, public_description, selling_price, image_urls, is_new_arrival, slug"
+            "id, model, name, category, size, colors, public_description, selling_price, image_urls, is_new_arrival, catalog_available, slug"
           )
           .eq("is_active", true)
           .eq("slug", slug)
@@ -280,15 +281,23 @@ function CatalogProductContent() {
           </p>
 
           <div className="mt-8 border-y border-[#e3dacb] py-5">
-            <p className="text-[9px] uppercase tracking-[0.22em] text-[#8C7042]">
-              Price
-            </p>
-            <p className="mt-2 font-serif text-3xl">{price}</p>
-            {price === "Price on request" && (
-              <p className="mt-2 text-xs leading-6 text-[#887D6D]">
-                Contact us for current pricing and availability.
-              </p>
+            {price !== "Price on request" && (
+              <>
+                <p className="text-[9px] uppercase tracking-[0.22em] text-[#8C7042]">
+                  Price
+                </p>
+                <p className="mt-2 font-serif text-3xl">{price}</p>
+              </>
             )}
+            <p
+              className={`${
+                price !== "Price on request" ? "mt-4" : ""
+              } text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                product.catalog_available ? "text-[#526047]" : "text-[#a14d3f]"
+              }`}
+            >
+              {product.catalog_available ? "Available" : "Out of stock"}
+            </p>
           </div>
 
           <dl className="mt-2 divide-y divide-[#e3dacb]">

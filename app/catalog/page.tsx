@@ -18,6 +18,7 @@ type Product = {
   is_new_arrival: boolean | null;
   slug: string | null;
   photoUrl: string;
+  catalog_available: boolean;
 };
 
 const WHATSAPP_NUMBER = "919998213691";
@@ -84,7 +85,7 @@ export default function CatalogPage() {
         const { data, error: queryError } = await supabase
           .from("catalog_products")
           .select(
-            "id, model, name, category, size, colors, public_description, selling_price, image_urls, is_active, is_new_arrival, slug"
+            "id, model, name, category, size, colors, public_description, selling_price, image_urls, is_active, is_new_arrival, catalog_available, slug"
           )
           .eq("is_active", true)
           .order("is_new_arrival", { ascending: false })
@@ -93,7 +94,6 @@ export default function CatalogPage() {
         if (queryError) throw queryError;
 
         const rows = (data ?? []) as Omit<Product, "photoUrl">[];
-
         const displayProducts = await Promise.all(
           rows.map(async (product) => {
             let photoUrl = "";
@@ -110,7 +110,10 @@ export default function CatalogPage() {
               }
             }
 
-            return { ...product, photoUrl } as Product;
+            return {
+              ...product,
+              photoUrl,
+            } as Product;
           })
         );
 
@@ -485,8 +488,17 @@ export default function CatalogPage() {
                     )}
 
                     <div className="mt-3 border-t border-[#e5ddd0] pt-3">
-                      <p className="text-sm font-medium text-[#414b37]">
-                        {formatPrice(price)}
+                      {price !== null && (
+                        <p className="text-sm font-medium text-[#414b37]">
+                          {formatPrice(price)}
+                        </p>
+                      )}
+                      <p
+                        className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                          product.catalog_available ? "text-[#526047]" : "text-[#a14d3f]"
+                        }`}
+                      >
+                        {product.catalog_available ? "Available" : "Out of stock"}
                       </p>
                       <a
                         href={getWhatsAppLink(product)}
