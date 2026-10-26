@@ -14,7 +14,9 @@ export async function updateSession(request: NextRequest) {
 
   // Customers can browse the public catalog without signing in.
   const isPublicCatalog =
-    pathname === "/catalog" || pathname.startsWith("/catalog/");
+    pathname === "/" ||
+    pathname === "/catalog" ||
+    pathname.startsWith("/catalog/");
 
   if (isPublicCatalog) {
     return supabaseResponse;
@@ -69,7 +71,7 @@ export async function updateSession(request: NextRequest) {
   if (isLoginPage) {
     if (isApprovedStaff) {
       const dashboardUrl = request.nextUrl.clone();
-      dashboardUrl.pathname = "/";
+      dashboardUrl.pathname = "/dashboard";
       dashboardUrl.search = "";
 
       const redirectResponse = NextResponse.redirect(dashboardUrl);

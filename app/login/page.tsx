@@ -30,7 +30,7 @@ export default function LoginPage() {
         return;
       }
 
-      window.location.href = "/";
+      window.location.href = "/dashboard";
     } catch (error) {
       setMessage(
         error instanceof Error
