@@ -14,10 +14,60 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Unity Enterprise",
+  metadataBase: new URL("https://www.unitybag.com"),
+  title: {
+    default: "Unity Enterprise | Jute, Cloth & Paper Bags",
+    template: "%s | Unity Enterprise",
+  },
   description:
-    "Unity Enterprise business workspace for product management, inventory, and the customer catalog.",
+    "Explore Unity Enterprise's reusable jute bags, cloth bags and paper bags in Bharuch, Gujarat. Browse product models, sizes, colours and availability, and enquire about your requirements.",
   applicationName: "Unity Enterprise",
+  keywords: [
+    "Unity Enterprise",
+    "jute bags",
+    "cloth bags",
+    "paper bags",
+    "reusable bags",
+    "carry bags",
+    "bag supplier in Bharuch",
+    "bag supplier in Gujarat",
+    "bulk bag enquiries",
+  ],
+  authors: [{ name: "Unity Enterprise" }],
+  publisher: "Unity Enterprise",
+  openGraph: {
+    title: "Unity Enterprise | Jute, Cloth & Paper Bags",
+    description:
+      "Browse reusable jute bags, cloth bags and paper bags from Unity Enterprise in Bharuch, Gujarat.",
+    url: "https://www.unitybag.com/catalog",
+    siteName: "Unity Enterprise",
+    locale: "en_IN",
+    type: "website",
+    images: [
+      {
+        url: "/unity-logo.png",
+        alt: "Unity Enterprise",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Unity Enterprise | Jute, Cloth & Paper Bags",
+    description:
+      "Explore reusable bag models, sizes, colours and availability from Unity Enterprise.",
+    images: ["/unity-logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

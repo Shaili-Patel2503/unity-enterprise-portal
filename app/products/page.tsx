@@ -1280,6 +1280,20 @@ export default function ProductsPage() {
               <p className="mt-2 text-sm text-[#817565]">
                 Search your collection and filter products by their current status.
               </p>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <a
+          href="/Unity-Enterprise-Product-Import-Template.xlsx"
+          download
+          className="inline-flex items-center justify-center rounded-full border border-[#d7c5a5] bg-white px-5 py-3 text-sm font-semibold text-[#66502e] transition hover:bg-[#f8f1e6]"
+        >
+          Download Excel Template
+        </a>        <a
+          href="/products/import"
+          className="inline-flex items-center justify-center rounded-full bg-[#302a24] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#4a4037]"
+        >
+          Import Products
+        </a>
+      </div>
             </div>
 
             <input
