@@ -12,13 +12,14 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Customers can browse the public catalog without signing in.
-  const isPublicCatalog =
+  // Public catalog and SEO files are accessible without staff login.
+  const isPublicRoute =
     pathname === "/" ||
     pathname === "/catalog" ||
-    pathname.startsWith("/catalog/");
-
-  if (isPublicCatalog) {
+    pathname.startsWith("/catalog/") ||
+    pathname === "/sitemap.xml" ||
+    pathname === "/robots.txt";
+  if (isPublicRoute) {
     return supabaseResponse;
   }
 
