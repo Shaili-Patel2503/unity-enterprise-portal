@@ -1,74 +1,118 @@
-# Unity Enterprise — Digital Bag Catalog & Storefront
+# Unity Enterprise
 
-A web application for **Unity Enterprise**, a small eco-friendly bag business based in Bharuch, Gujarat, India. The project aims to modernize product discovery and customer inquiries through a digital catalog and online storefront.
+### A deployed product catalog and internal management portal for a wholesale bag business
 
-## Project Overview
+Unity Enterprise is a web application built for a family-owned bag business in Bharuch, Gujarat, India. It brings the public product catalog and internal product and inventory workflows into one application, while preserving the business's existing customer enquiry process.
 
-Unity Enterprise traditionally manages product information and customer inquiries through product photos, PDF catalogs, phone calls, and WhatsApp. This project brings the product browsing experience into a web application that customers can access from anywhere.
+- **Live website:** https://www.unitybag.com
+- **Customer catalog:** https://www.unitybag.com/catalog
+- **Source code:** https://github.com/Shaili-Patel2503/unity-enterprise-portal
+
+---
+
+## Overview
+
+The business previously relied on product photos, PDF catalogs, phone calls, and WhatsApp to share product information. Unity Enterprise provides a public catalog for product discovery and a staff-facing portal for maintaining product records and reviewing inventory information.
+
+The project focuses on practical application engineering: spreadsheet import and validation, product-photo handling, database-backed workflows, access control, and production deployment.
 
 ## Features
 
-- **Product catalog:** Browse available bag models and product information.
-- **Product detail pages:** View individual products and their available information.
-- **Online storefront:** A dedicated public-facing storefront.
-- **WhatsApp inquiries:** Contact the business to enquire about products.
-- **Supabase integration:** Connect the application to its product data.
-- **Product image storage:** Store and display product images using Supabase Storage.
-- **Responsive interface:** Built with modern web technologies for a web-based browsing experience.
+### Public product catalog
 
-> Feature availability depends on the current implementation and database configuration. Planned features are listed separately below.
+- Browse active products and their available details.
+- View product pages with photographs, sizes, colours, descriptions, and pricing where provided.
+- Keep inactive internal product records out of the public catalog.
+- Display catalog availability separately from whether a product is active.
 
-## Technology Stack
+### Product management
 
-| Technology | Purpose |
+- Review and search product records.
+- Maintain model, name, category, size, colour, cost, selling-price, description, and image information where applicable.
+- Upload product photographs to Supabase Storage.
+
+### Excel product importer
+
+The `.xlsx` importer supports a preview-and-validation workflow before creating products.
+
+- Read product rows from the workbook.
+- Extract supported embedded workbook images and match them to product rows.
+- Flag validation problems such as duplicate model numbers, missing or multiple matched photos, and invalid numeric values.
+- Compress product photographs and upload them to Supabase Storage.
+- Store the uploaded image path against the product record.
+- Create imported products in a safe initial state: inactive, unavailable from the public catalog, and stock-unverified.
+- Keep product import separate from inventory creation; importing a product does not automatically create inventory balances, movements, or stock-count records.
+
+Controlled tests have been run for a single-product import, duplicate protection, and spreadsheet validation scenarios.
+
+### Inventory views
+
+- Review recorded balances by product and location.
+- Review inventory movements and their reasons.
+- View stock-count records when present.
+- Keep recorded stock quantities distinct from physical stock verification.
+
+Inventory quantities should be treated as recorded values, not physically verified stock, until the business completes its counting process.
+
+### Authentication and access control
+
+- Supabase Authentication for staff access.
+- Row Level Security (RLS) policies for key database tables.
+- Staff-restricted operations for relevant product, inventory, and storage actions.
+- Public catalog access separated from internal management workflows.
+
+### Deployment and development
+
+- Deployed website using the project's production hosting setup.
+- TypeScript checks and optimized production builds using Next.js.
+- Git and GitHub for source control.
+
+## Technology stack
+
+| Area | Technologies |
 |---|---|
-| Next.js | React framework and application routing |
-| React | Component-based user interface |
-| TypeScript | Type-safe JavaScript development |
-| Tailwind CSS | Styling and responsive layouts |
-| Supabase | Database and backend services |
-| Supabase Storage | Product image storage |
-| Git | Version control |
-| GitHub | Source-code hosting and collaboration |
-| npm | Dependency management and project scripts |
-| Vercel | Planned deployment and hosting |
+| Application framework | Next.js App Router, React |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| Database | Supabase PostgreSQL |
+| Authentication | Supabase Auth |
+| Image storage | Supabase Storage |
+| Spreadsheet processing | SheetJS (`xlsx`), JSZip |
+| Image processing | `browser-image-compression` |
+| Version control | Git, GitHub |
+| Hosting | Vercel |
 
-## Application Structure
+## High-level architecture
 
 ```text
-unity-enterprise-portal/
-├── app/
-│   ├── catalog/       # Public product catalog and product details
-│   ├── login/         # Login interface
-│   ├── products/      # Product management pages
-│   ├── store/         # Public storefront
-│   ├── layout.tsx     # Root application layout
-│   ├── page.tsx       # Main application page
-│   └── globals.css    # Global styles
-├── lib/
-│   └── supabase/      # Supabase client and related utilities
-├── public/            # Static assets and business logo
-├── proxy.ts           # Application request handling, as implemented
-├── package.json       # Dependencies and npm scripts
-└── README.md
+Customers                         Staff
+   |                                |
+   v                                v
+Public catalog                 Staff portal
+   |                         /       |        \
+   |                    Products  Inventory  Excel import
+   |                         \       |        /
+   +---------------------------+----+--------+
+                               |
+                               v
+                         Supabase platform
+                    PostgreSQL | Auth | Storage
 ```
 
-The structure may evolve as the application grows.
+The public catalog reads active product records through the catalog view. Staff workflows use the application's authenticated database access policies.
 
-## Getting Started
+## Run locally
 
 ### Prerequisites
 
-- Node.js
-- npm
-- A Supabase project with the required database tables and storage configured
+- Node.js and npm
+- Access to a configured Supabase project
+- Required environment variables for the application's Supabase configuration
 
 ### 1. Clone the repository
 
-After the GitHub repository has been created:
-
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
+git clone https://github.com/Shaili-Patel2503/unity-enterprise-portal.git
 cd unity-enterprise-portal
 ```
 
@@ -80,54 +124,49 @@ npm install
 
 ### 3. Configure environment variables
 
-Create a `.env.local` file in the project root. Add the variable names required by the application's Supabase configuration, using your own Supabase project values.
+Create a local `.env.local` file in the project root and configure the variable names expected by the project's Supabase client and application configuration. Use your own project values.
 
-Do not commit `.env.local` or publish secret keys.
+**Never commit `.env.local`, passwords, service-role keys, or other secrets.**
 
-### 4. Run the development server
+### 4. Start the development server
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open http://localhost:3000.
 
-### 5. Build for production
+### 5. Run a production build
 
 ```bash
 npm run build
 ```
 
-## Configuration and Security
+The application requires the corresponding Supabase schema, database functions, access policies, and Storage configuration for the relevant features to work.
 
-- Environment-specific credentials must remain outside version control.
-- Configure the necessary environment variables in the deployment platform.
-- Apply appropriate Supabase Row Level Security (RLS) policies to database tables.
-- Do not expose Supabase service-role keys in client-side code.
-- Restrict product-management operations to authorized users as the application evolves.
+## Engineering considerations
 
-## Roadmap
+- **Validate before writing:** Preview spreadsheet data and surface issues before importing.
+- **Prevent accidental duplicates:** Check duplicate product models before creating records.
+- **Use safe import defaults:** Newly imported products are inactive and stock-unverified.
+- **Separate products from stock:** Product creation does not imply verified physical inventory.
+- **Control public visibility:** Internal records should not automatically appear in the public catalog.
+- **Protect privileged operations:** Use database policies and staff authorization checks.
 
-Potential future improvements include:
+## Current scope and verification
 
-- Secure administrator authentication and authorization
-- Product creation, editing, and image management
-- Inventory and stock tracking
-- Product variants, sizes, and pricing management
-- Improved catalog search and filtering
-- Automated catalog generation
-- Deployment and production monitoring
-- Additional customer inquiry and order-management workflows
+- The production build and TypeScript checks passed during the latest project closeout.
+- Controlled tests passed for the Excel importer, duplicate protection, and validation cases.
+- The test product's image was confirmed in Supabase Storage, and the test product remained inactive with no related inventory records.
+- The public catalog data audit found 83 active catalog records with image paths and slugs.
+- Product and inventory pages were checked on the deployed website.
+- The order-management interface and database functions exist, but the business currently handles customer enquiries through its existing phone/WhatsApp workflow. The order workflow has not been fully verified end to end.
+- A complete, restorable database-and-storage backup procedure remains an operational follow-up; CSV exports alone are not a full backup.
 
-Roadmap items are proposals and should not be interpreted as completed features.
+## Business context
 
-## Business Context
-
-**Unity Enterprise**  
-Bharuch, Gujarat, India
-
-The project focuses on helping a small bag business present its products digitally and make customer inquiries easier to manage.
+Unity Enterprise is a practical software project built around the needs of a small wholesale bag business. Its goal is to improve product discovery and internal record management without forcing the business to change its current customer enquiry process.
 
 ## License
 
-All rights reserved unless a license is added explicitly by the project owner.
+No open-source license is provided in this repository. All rights are reserved unless the project owner adds a license explicitly.
