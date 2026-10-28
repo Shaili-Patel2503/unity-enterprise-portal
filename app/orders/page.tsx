@@ -1087,32 +1087,64 @@ export default function OrdersPage() {
                       </p>
                     </div>
 
-                    <div className="mt-5">
-                      <h4 className="text-sm font-bold text-[#354c38]">
-                        Status history
-                      </h4>
-                      {order.history.length === 0 ? (
-                        <p className="mt-2 text-xs text-[#818779]">
-                          No status changes have been recorded yet.
-                        </p>
-                      ) : (
-                        <div className="mt-3 space-y-2">
-                          {order.history.map((entry) => (
-                            <div
-                              key={entry.id}
-                              className="rounded-xl border border-[#ece9df] px-3 py-3 text-xs"
-                            >
-                              <p className="font-semibold text-[#485746]">
+                    <div className="mt-5 rounded-2xl border border-[#e9e5d9] bg-[#fcfcf8] p-4 sm:p-5">
+                      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-sm font-bold text-[#354c38]">
+                            Order status timeline
+                          </h4>
+                          <p className="mt-1 text-xs text-[#818779]">
+                            Follow this order from creation to its latest update.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-[#eaf0e4] px-2.5 py-1 text-[11px] font-semibold text-[#405a40]">
+                          {order.history.length + 1} {order.history.length === 0 ? "event" : "events"}
+                        </span>
+                      </div>
+                      <ol className="relative ml-2 border-l-2 border-[#dfe6d8] pl-5">
+                        <li className="relative pb-5">
+                          <span className="absolute -left-[1.72rem] top-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#405a40] bg-[#f8faf5]">
+                            <span className="h-2 w-2 rounded-full bg-[#405a40]" />
+                          </span>
+                          <div className="rounded-xl border border-[#e9e5d9] bg-white p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-[#354c38]">
+                                Order created
+                              </p>
+                              <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${statusClass("ENQUIRY")}`}>
+                                Enquiry
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-[#818779]">
+                              {formatDate(order.created_at)}
+                            </p>
+                          </div>
+                        </li>
+                        {[...order.history].reverse().map((entry, index) => (
+                          <li
+                            key={entry.id}
+                            className={`relative ${index === order.history.length - 1 ? "" : "pb-5"}`}
+                          >
+                            <span className="absolute -left-[1.72rem] top-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#a17a3e] bg-[#fffaf0]">
+                              <span className="h-2 w-2 rounded-full bg-[#a17a3e]" />
+                            </span>
+                            <div className="rounded-xl border border-[#e9e5d9] bg-white p-3">
+                              <p className="text-sm font-semibold text-[#485746]">
                                 {readableStatus(entry.previous_status)}{" "}
                                 <span aria-hidden="true">→</span>{" "}
                                 {readableStatus(entry.new_status)}
                               </p>
-                              <p className="mt-1 text-[#818779]">
+                              <p className="mt-1 text-xs text-[#818779]">
                                 {formatDate(entry.changed_at)}
                               </p>
                             </div>
-                          ))}
-                        </div>
+                          </li>
+                        ))}
+                      </ol>
+                      {order.history.length === 0 && (
+                        <p className="mt-2 text-xs text-[#818779]">
+                          No status changes have been recorded yet.
+                        </p>
                       )}
                     </div>
                   </article>

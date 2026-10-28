@@ -162,7 +162,7 @@ function ProductPhoto({
 
   if (!src || failed) {
     return (
-      <div className="flex h-full min-h-64 flex-col items-center justify-center bg-[#f2eee5] px-6 text-center">
+      <div className="flex h-full min-h-64 w-full flex-col items-center justify-center bg-[#f2eee5] px-6 text-center">
         <img
           src="/unity-logo.png"
           alt=""
@@ -179,14 +179,16 @@ function ProductPhoto({
   }
 
   return (
-    <img
-      src={src}
-      alt={name}
-      loading="lazy"
-      decoding="async"
-      onError={() => setFailed(true)}
-      className="h-full min-h-64 w-full object-contain p-5 transition duration-500 group-hover:scale-[1.035]"
-    />
+    <div className="flex h-full min-h-64 w-full items-center justify-center overflow-hidden bg-[#f3eee4] p-4 sm:p-6">
+      <img
+        src={src}
+        alt={name}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="block max-h-full max-w-full object-contain object-center"
+      />
+    </div>
   );
 }
 
@@ -228,14 +230,16 @@ function ExistingPhoto({
   return (
     <div className="rounded-xl border border-[#e9dfce] bg-[#f7f4ec] p-2">
       {url && !failed ? (
-        <img
-          src={url}
-          alt="Existing product photo"
-          onError={() => setFailed(true)}
-          className="h-32 w-full rounded-lg bg-white object-contain"
-        />
+        <div className="flex h-64 items-center justify-center overflow-hidden rounded-lg bg-white p-3 sm:h-72">
+          <img
+            src={url}
+            alt="Existing product photo"
+            onError={() => setFailed(true)}
+            className="block max-h-full max-w-full object-contain object-center"
+          />
+        </div>
       ) : (
-        <div className="flex h-32 items-center justify-center rounded-lg bg-white px-3 text-center text-xs text-[#817565]">
+        <div className="flex h-64 items-center justify-center rounded-lg bg-white px-3 text-center text-xs text-[#817565] sm:h-72">
           {failed ? "Photo could not be loaded" : "Loading photo..."}
         </div>
       )}
@@ -391,6 +395,7 @@ export default function ProductsPage() {
       isNewArrival: "false",
       catalogAvailable: "false",
     });
+
     // Never copy photos or photo-removal instructions to the new product.
     setNewPhotos([]);
     setRemoveExistingPaths([]);
@@ -401,6 +406,7 @@ export default function ProductsPage() {
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
   function openNewProductForm() {
     if (showForm) {
       resetForm();
@@ -710,6 +716,7 @@ export default function ProductsPage() {
     if (selectedIds.length === 0 || bulkUpdating) return;
     setBulkUpdating(true);
     setMessage("");
+
     try {
       const supabase = createClient();
       const { data, error } = await supabase
@@ -717,15 +724,19 @@ export default function ProductsPage() {
         .update({ catalog_available: available })
         .in("id", selectedIds)
         .select(productSelect);
+
       if (error) throw error;
+
       const updatedRows = (data ?? []) as DatabaseProduct[];
       if (updatedRows.length === 0) {
         throw new Error("No products were updated.");
       }
+
       const updatedById = new Map<number, Product>(
         updatedRows.map((row) => {
           const updated = toProduct(row);
           const previous = products.find((item) => item.id === updated.id);
+
           return [
             updated.id,
             {
@@ -735,10 +746,12 @@ export default function ProductsPage() {
           ] as const;
         })
       );
+
       setProducts((current) =>
         current.map((item) => updatedById.get(item.id) ?? item)
       );
       setSelectedProductIds([]);
+
       setMessage(
         `${updatedRows.length} product(s) marked ${
           available ? "Available" : "Out of stock"
@@ -753,6 +766,7 @@ export default function ProductsPage() {
       setBulkUpdating(false);
     }
   }
+
   async function deleteProduct(product: Product) {
     const confirmed = window.confirm(
       "Delete this product from the shared database? This affects all authorised staff accounts."
@@ -800,16 +814,12 @@ export default function ProductsPage() {
     switch (filter) {
       case "published":
         return product.isActive;
-
       case "hidden":
         return !product.isActive;
-
       case "price-missing":
         return !validPrice(product.price);
-
       case "photos-missing":
         return product.imageUrls.length === 0;
-
       default:
         return true;
     }
@@ -866,11 +876,9 @@ export default function ProductsPage() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#a17a3e] sm:text-xs">
                   Unity Enterprise · Bharuch
                 </p>
-
                 <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
                   Products &amp; Catalog
                 </h1>
-
                 <p className="mt-2 max-w-xl text-sm leading-6 text-[#817565]">
                   Manage bag models, pricing, photos and customer visibility
                   in one place.
@@ -940,11 +948,9 @@ export default function ProductsPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a17a3e]">
                 Product management
               </p>
-
               <h2 className="mt-2 text-2xl font-semibold">
                 {editingId === null ? "Add a bag model" : "Edit bag model"}
               </h2>
-
               <p className="mt-2 text-sm leading-6 text-[#817565]">
                 Landed costs and internal notes are staff-only fields. Only
                 approved public details belong in the customer catalog.
@@ -1108,6 +1114,7 @@ export default function ProductsPage() {
                     separate from the physical stock recorded in Inventory.
                   </span>
                 </label>
+
                 <label className="flex items-start gap-3 text-sm">
                   <input
                     type="checkbox"
@@ -1175,6 +1182,7 @@ export default function ProductsPage() {
                       {newPhotos.length}/10 selected
                     </span>
                   </div>
+
                   <input
                     type="file"
                     accept="image/*"
@@ -1186,6 +1194,7 @@ export default function ProductsPage() {
                     }}
                     className="mt-4 block w-full cursor-pointer rounded-xl border border-[#e5dac8] bg-white px-3.5 py-3 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-[#e9e4d6] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#43533b]"
                   />
+
                   <p className="mt-3 text-xs leading-5 text-[#817565]">
                     You can add photos in multiple selections or drag them
                     into this area. Up to 10 new photos, each 10 MB or smaller.
@@ -1280,20 +1289,22 @@ export default function ProductsPage() {
               <p className="mt-2 text-sm text-[#817565]">
                 Search your collection and filter products by their current status.
               </p>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <a
-          href="/Unity-Enterprise-Product-Import-Template.xlsx"
-          download
-          className="inline-flex items-center justify-center rounded-full border border-[#d7c5a5] bg-white px-5 py-3 text-sm font-semibold text-[#66502e] transition hover:bg-[#f8f1e6]"
-        >
-          Download Excel Template
-        </a>        <a
-          href="/products/import"
-          className="inline-flex items-center justify-center rounded-full bg-[#302a24] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#4a4037]"
-        >
-          Import Products
-        </a>
-      </div>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <a
+                  href="/Unity-Enterprise-Product-Import-Template.xlsx"
+                  download
+                  className="inline-flex items-center justify-center rounded-full border border-[#d7c5a5] bg-white px-5 py-3 text-sm font-semibold text-[#66502e] transition hover:bg-[#f8f1e6]"
+                >
+                  Download Excel Template
+                </a>
+                <a
+                  href="/products/import"
+                  className="inline-flex items-center justify-center rounded-full bg-[#302a24] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#4a4037]"
+                >
+                  Import Products
+                </a>
+              </div>
             </div>
 
             <input
@@ -1382,6 +1393,7 @@ export default function ProductsPage() {
                     const visibleIds = filteredProducts.map(
                       (product) => product.id
                     );
+
                     setSelectedProductIds((current) =>
                       event.target.checked
                         ? Array.from(new Set([...current, ...visibleIds]))
@@ -1392,10 +1404,12 @@ export default function ProductsPage() {
                 />
                 Select all shown ({filteredProducts.length})
               </label>
+
               <span className="text-xs text-[#817565]">
                 {selectedProductIds.length} selected
               </span>
             </div>
+
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1405,6 +1419,7 @@ export default function ProductsPage() {
               >
                 {bulkUpdating ? "Updating..." : "Mark selected Available"}
               </button>
+
               <button
                 type="button"
                 disabled={selectedProductIds.length === 0 || bulkUpdating}
@@ -1413,6 +1428,7 @@ export default function ProductsPage() {
               >
                 Mark selected Out of stock
               </button>
+
               <button
                 type="button"
                 disabled={selectedProductIds.length === 0 || bulkUpdating}
@@ -1422,11 +1438,13 @@ export default function ProductsPage() {
                 Clear selection
               </button>
             </div>
+
             <p className="mt-3 text-xs leading-5 text-[#817565]">
               These actions change only customer-facing catalog availability.
               They do not change stock quantities at Home or Godown.
             </p>
           </div>
+
           {filteredProducts.length === 0 ? (
             <div className="mt-6 rounded-3xl border border-dashed border-[#d9cbb4] bg-[#fffdf8] px-5 py-16 text-center">
               <img
@@ -1477,6 +1495,7 @@ export default function ProductsPage() {
                         disabled={bulkUpdating}
                         onChange={(event) => {
                           const checked = event.target.checked;
+
                           setSelectedProductIds((current) =>
                             checked
                               ? Array.from(new Set([...current, product.id]))
@@ -1488,6 +1507,7 @@ export default function ProductsPage() {
                       />
                       Select
                     </label>
+
                     <a
                       href={
                         product.slug
@@ -1625,6 +1645,7 @@ export default function ProductsPage() {
                               {product.catalogAvailable ? "Available" : "Out of stock"}
                             </strong>
                           </p>
+
                           {product.notes && (
                             <p className="break-words">
                               <span className="text-[#817565]">Internal notes:</span>{" "}
@@ -1642,6 +1663,7 @@ export default function ProductsPage() {
                         >
                           Edit
                         </button>
+
                         <button
                           type="button"
                           onClick={() => startDuplicating(product)}
